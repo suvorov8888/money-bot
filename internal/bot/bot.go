@@ -2,7 +2,9 @@ package bot
 
 import (
 	"log"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"money-bot/internal/handlers" // Импортируем наши хендлеры
@@ -32,46 +34,54 @@ func (b *Bot) Run() {
 	updates := b.api.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message == nil { // Игнорируем все обновления, которые не являются сообщениями
+		if update.Message == nil {
 			continue
 		}
 
-		// Сначала проверяем, является ли сообщение командой
 		if update.Message.IsCommand() {
 			switch update.Message.Command() {
 			case "start":
 				handlers.HandleStart(b.api, update)
 			default:
-				// Обработка неизвестной команды
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Я не знаю такой команды.")
 				b.api.Send(msg)
 			}
-		} else {
-			// Если это не команда, пробуем обработать как число
-			amount, err := strconv.ParseFloat(update.Message.Text, 64)
-			if err == nil {
-				// Если это число, сохраняем его
-				b.saveTransaction(update, amount)
-			} else {
-				// Если это не число, отправляем сообщение об ошибке
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Пожалуйста, введите число (например, 1000 для дохода или -500 для расхода).")
-				b.api.Send(msg)
+			continue
+		}
+
+		// Используем регулярное выражение для поиска числа в начале сообщения
+		re := regexp.MustCompile(`^-?\d+(\.\d+)?`)
+		matches := re.FindStringSubmatch(update.Message.Text)
+
+		if len(matches) > 0 {
+			amount, err := strconv.ParseFloat(matches[0], 64)
+			if err != nil {
+				log.Printf("Ошибка при парсинге числа: %v", err)
+				continue
 			}
+
+			// Получаем комментарий, обрезая число
+			comment := strings.TrimSpace(strings.Replace(update.Message.Text, matches[0], "", 1))
+
+			b.saveTransaction(update, amount, comment)
+		} else {
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Пожалуйста, введите число (например, 1000 или -500 на кофе).")
+			b.api.Send(msg)
 		}
 	}
 }
 
 // saveTransaction сохраняет транзакцию в базе данных
-func (b *Bot) saveTransaction(update tgbotapi.Update, amount float64) {
+func (b *Bot) saveTransaction(update tgbotapi.Update, amount float64, comment string) {
 	transaction := &storage.Transaction{
 		UserID:          update.Message.From.ID,
 		Amount:          amount,
-		Comment:         "", // Пока без комментариев
+		Comment:         comment,
 		TransactionDate: time.Now(),
 	}
 
 	if err := b.storage.SaveTransaction(transaction); err != nil {
-		log.Printf("Error saving transaction: %v", err)
+		log.Printf("Ошибка при сохранении транзакции: %v", err)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Произошла ошибка при сохранении транзакции. Попробуйте еще раз.")
 		b.api.Send(msg)
 	} else {
@@ -80,6 +90,9 @@ func (b *Bot) saveTransaction(update tgbotapi.Update, amount float64) {
 			responseText = "✅ Доход успешно сохранён!"
 		} else {
 			responseText = "✅ Расход успешно сохранён!"
+		}
+		if comment != "" {
+			responseText += "\nКомментарий: " + comment
 		}
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, responseText)
 		b.api.Send(msg)
