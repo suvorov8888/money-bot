@@ -42,6 +42,15 @@ func (b *Bot) Run() {
 			switch update.Message.Command() {
 			case "start":
 				handlers.HandleStart(b.api, update)
+			case "today":
+				handlers.HandleReport(b.api, update, b.storage, "today")
+				log.Printf("Получена команда /today от пользователя %s", update.Message.From.UserName)
+			case "week":
+				handlers.HandleReport(b.api, update, b.storage, "week")
+				log.Printf("Получена команда /week от пользователя %s", update.Message.From.UserName)
+			case "month":
+				handlers.HandleReport(b.api, update, b.storage, "month")
+				log.Printf("Получена команда /month от пользователя %s", update.Message.From.UserName)
 			default:
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Я не знаю такой команды.")
 				b.api.Send(msg)
