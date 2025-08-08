@@ -4,18 +4,20 @@ import (
 	"log"
 
 	"money-bot/internal/handlers" // Импортируем наши хендлеры
+	"money-bot/internal/storage"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // Bot структура содержит ссылку на API и другие зависимости
 type Bot struct {
-	api *tgbotapi.BotAPI
+	api     *tgbotapi.BotAPI
+	storage *storage.Storage // Добавляем поле для хранилища
 }
 
 // NewBot создает новый экземпляр бота
-func NewBot(api *tgbotapi.BotAPI) *Bot {
-	return &Bot{api: api}
+func NewBot(api *tgbotapi.BotAPI, s *storage.Storage) *Bot {
+	return &Bot{api: api, storage: s}
 }
 
 // Run запускает бота и обрабатывает входящие сообщения
