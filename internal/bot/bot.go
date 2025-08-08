@@ -3,6 +3,8 @@ package bot
 import (
 	"log"
 
+	"money-bot/internal/handlers" // Импортируем наши хендлеры
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -29,6 +31,13 @@ func (b *Bot) Run() {
 		if update.Message != nil {
 			// Логика обработки сообщений будет здесь
 			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+
+			switch update.Message.Command() {
+			case "start":
+				handlers.HandleStart(b.api, update)
+			default:
+				// Обработка неизвестной команды (позже)
+			}
 		}
 	}
 }
