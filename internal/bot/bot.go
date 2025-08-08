@@ -51,6 +51,9 @@ func (b *Bot) Run() {
 			case "month":
 				handlers.HandleReport(b.api, update, b.storage, "month")
 				log.Printf("Получена команда /month от пользователя %s", update.Message.From.UserName)
+			case "export":
+				handlers.HandleExport(b.api, update, b.storage)
+				log.Printf("Получена команда /export от пользователя %s", update.Message.From.UserName)
 			default:
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Я не знаю такой команды.")
 				b.api.Send(msg)

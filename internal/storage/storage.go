@@ -51,3 +51,10 @@ func (s *Storage) GetPeriodSummary(userID int64, from, to time.Time) (float64, e
 	result := s.db.Model(&Transaction{}).Where("user_id = ? AND transaction_date BETWEEN ? AND ?", userID, from, to).Select("SUM(amount)").Row().Scan(&total)
 	return total, result
 }
+
+// GetAllTransactions возвращает все транзакции пользователя
+func (s *Storage) GetAllTransactions(userID int64) ([]Transaction, error) {
+	var transactions []Transaction
+	result := s.db.Where("user_id = ?", userID).Find(&transactions)
+	return transactions, result.Error
+}
