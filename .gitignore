@@ -1,0 +1,37 @@
+# Скомпилированные бинарники
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Объектные файлы
+*.o
+*.a
+*.out
+
+# Кэш и временные файлы Go
+*.log
+*.tmp
+*.temp
+*.swp
+.DS_Store
+Thumbs.db
+
+# go build / go install
+bin/
+build/
+
+# Go modules cache
+vendor/
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.code-workspace
+
+# Тестовые результаты
+*.test
+
+# Скрытые системные файлы
+.env
