@@ -58,3 +58,36 @@ func (s *Storage) GetAllTransactions(userID int64) ([]Transaction, error) {
 	result := s.db.Where("user_id = ?", userID).Find(&transactions)
 	return transactions, result.Error
 }
+
+// DeleteLastTransaction находит и удаляет последнюю транзакцию пользователя.
+// Возвращает удаленную транзакцию или ошибку, если транзакций нет.
+func (s *Storage) DeleteLastTransaction(userID int64) (*Transaction, error) {
+	var lastTransaction Transaction
+	// Ищем последнюю транзакцию по ID, так как это самый надежный способ найти последнюю запись
+	if err := s.db.Where("user_id = ?", userID).Order("id desc").First(&lastTransaction).Error; err != nil {
+		// Возвращаем ошибку, если ничего не найдено (gorm.ErrRecordNotFound)
+		return nil, err
+	}
+
+	// Удаляем найденную транзакцию
+	if err := s.db.Delete(&lastTransaction).Error; err != nil {
+		return nil, err
+	}
+
+	return &lastTransaction, nil
+}
+
+// DeleteTransactionsForToday удаляет все транзакции пользователя за сегодняшний день.
+// Возвращает количество удаленных транзакций.
+func (s *Storage) DeleteTransactionsForToday(userID int64) (int64, error) {
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24*time.Hour - 1) // Конец дня
+
+	result := s.db.Where("user_id = ? AND transaction_date BETWEEN ? AND ?", userID, startOfDay, endOfDay).Delete(&Transaction{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}

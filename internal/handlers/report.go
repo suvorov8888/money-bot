@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 // HandleReport генерирует и отправляет отчет по транзакциям за определенный период
 func HandleReport(bot *tgbotapi.BotAPI, update tgbotapi.Update, s *storage.Storage, period string) {
+	log.Printf("Начало обработки отчета за период '%s' для пользователя %s (ID: %d)", period, update.Message.From.UserName, update.Message.From.ID)
 	var (
 		from, to    time.Time
 		reportTitle string
@@ -28,28 +30,40 @@ func HandleReport(bot *tgbotapi.BotAPI, update tgbotapi.Update, s *storage.Stora
 		from, to = GetStartAndEndOfMonth()
 		reportTitle = "Итоги за месяц"
 	default:
+		log.Printf("Неизвестный период для отчета: %s", period)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неизвестный период для отчета.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("Ошибка при отправке сообщения о неизвестном периоде: %v", err)
+		}
 		return
 	}
+	log.Printf("Рассчитан временной интервал для отчета: с %s по %s", from.Format(time.RFC3339), to.Format(time.RFC3339))
 
+	log.Printf("Запрос транзакций из БД для UserID: %d", update.Message.From.ID)
 	transactions, err := s.GetTransactionsByPeriod(update.Message.From.ID, from, to)
 	if err != nil {
+		log.Printf("Ошибка при получении транзакций из БД: %v", err)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка при получении данных.")
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("Ошибка при отправке сообщения об ошибке получения данных: %v", err)
+		}
 		return
 	}
 
 	if len(transactions) == 0 {
+		log.Printf("Транзакции за период не найдены для UserID: %d", update.Message.From.ID)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%s: транзакций не найдено.", reportTitle))
-		bot.Send(msg)
+		if _, err := bot.Send(msg); err != nil {
+			log.Printf("Ошибка при отправке сообщения об отсутствии транзакций: %v", err)
+		}
 		return
 	}
+	log.Printf("Найдено %d транзакций. Начинаем формирование отчета.", len(transactions))
 
 	var responseText strings.Builder
-	// Экранируем специальные символы для MarkdownV2
-	title := strings.ReplaceAll(reportTitle, "_", "\\_")
-	responseText.WriteString(fmt.Sprintf("📊 *%s* 📊\n\n", title))
+	// Заголовки отчетов не содержат спецсимволов, поэтому можно не экранировать.
+	// Звёздочки для жирного шрифта — это часть нашей разметки.
+	responseText.WriteString(fmt.Sprintf("📊 *%s* 📊\n\n", reportTitle))
 
 	var totalIncome, totalExpense float64
 	for _, tr := range transactions {
@@ -58,25 +72,29 @@ func HandleReport(bot *tgbotapi.BotAPI, update tgbotapi.Update, s *storage.Stora
 		} else {
 			totalExpense += tr.Amount
 		}
-		// Форматируем каждую транзакцию для вывода
-		sign := ""
+		sign := "➕"
 		if tr.Amount < 0 {
 			sign = "➖"
-		} else {
-			sign = "➕"
 		}
-		// Экранируем `.` в сумме и другие символы
-		amountStr := strings.ReplaceAll(fmt.Sprintf("%.2f", tr.Amount), ".", "\\.")
-		comment := strings.ReplaceAll(tr.Comment, "_", "\\_")
-		responseText.WriteString(fmt.Sprintf("%s `%s` руб\\. \\| %s\n", sign, amountStr, comment))
+		// Суммы в блоках `code` (обратные кавычки), их экранировать не нужно.
+		amountStr := fmt.Sprintf("%.2f", tr.Amount)
+		// Комментарий может содержать спецсимволы, его нужно экранировать.
+		escapedComment := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, tr.Comment)
+		// Добавляем категорию в отчет, чтобы было нагляднее
+		escapedCategory := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, tr.Category)
+		responseText.WriteString(fmt.Sprintf("%s `%s` руб\\. \\| %s \\(*%s*\\)\n", sign, amountStr, escapedComment, escapedCategory))
 	}
 
 	responseText.WriteString("\n\\-\\-\\-\n")
-	responseText.WriteString(fmt.Sprintf("💰 *Доходы*: `%s` руб\\.", strings.ReplaceAll(fmt.Sprintf("%.2f", totalIncome), ".", "\\.")))
-	responseText.WriteString(fmt.Sprintf("\n💸 *Расходы*: `%s` руб\\.", strings.ReplaceAll(fmt.Sprintf("%.2f", totalExpense), ".", "\\.")))
-	responseText.WriteString(fmt.Sprintf("\n📈 *Баланс*: `%s` руб\\.", strings.ReplaceAll(fmt.Sprintf("%.2f", totalIncome+totalExpense), ".", "\\.")))
+	responseText.WriteString(fmt.Sprintf("💰 *Доходы*: `%.2f` руб\\.\n", totalIncome))
+	responseText.WriteString(fmt.Sprintf("💸 *Расходы*: `%.2f` руб\\.\n", totalExpense))
+	responseText.WriteString(fmt.Sprintf("📈 *Баланс*: `%.2f` руб\\.", totalIncome+totalExpense))
 
+	log.Printf("Отчет сформирован. Итоги: Доход=%.2f, Расход=%.2f, Баланс=%.2f", totalIncome, totalExpense, totalIncome+totalExpense)
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, responseText.String())
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
-	bot.Send(msg)
+	log.Println("Отправка отчета пользователю.")
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("Ошибка при отправке отчета: %v", err)
+	}
 }
