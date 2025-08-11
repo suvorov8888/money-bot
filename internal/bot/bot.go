@@ -16,29 +16,38 @@ import (
 
 // Bot структура содержит ссылку на API и другие зависимости
 type Bot struct {
-	api     *tgbotapi.BotAPI
-	storage *storage.Storage // Добавляем поле для хранилища
-}
-
-// Список категорий для классификации.
-// В будущем его можно будет загружать из файла конфигурации или базы данных для каждого пользователя.
-var transactionCategories = []string{
-	"Транспорт",
-	"Автомобиль",
-	"Еда вне дома",
-	"Продукты",
-	"Развлечения",
-	"Коммунальные платежи",
-	"Одежда",
-	"Здоровье",
-	"Образование",
-	"Подарки",
-	"Прочее",
+	api        *tgbotapi.BotAPI
+	storage    *storage.Storage // Добавляем поле для хранилища
+	categories []string         // Добавляем поле для категорий
 }
 
 // NewBot создает новый экземпляр бота
 func NewBot(api *tgbotapi.BotAPI, s *storage.Storage) *Bot {
-	return &Bot{api: api, storage: s}
+	// В будущем этот список можно будет загружать из файла конфигурации или базы данных
+	defaultCategories := []string{
+		"Автомобиль",           // Бензин, страховка, ремонт
+		"Еда вне дома",         // Рестораны, кафе, доставка
+		"Здоровье",             // Аптеки, врачи, страховка
+		"Коммунальные платежи", // Аренда, ЖКУ, интернет
+		"Одежда и обувь",
+		"Образование", // Курсы, книги, обучение
+		"Питомцы",     // Корм, игрушки, ветеринар
+		"Подарки",
+		"Продукты",         // Покупки в супермаркетах
+		"Путешествия",      // Билеты, отели, расходы в отпуске
+		"Развлечения",      // Кино, концерты, хобби
+		"Связь и подписки", // Мобильная связь, стриминговые сервисы
+		"Спорт и фитнес",   // Абонемент в зал, спорттовары
+		"Товары для дома",  // Мебель, бытовая химия, декор
+		"Транспорт",        // Общественный транспорт, такси
+		"Уход за собой",    // Косметика, парикмахерская, спа
+		"Прочее",           // Другие расходы
+	}
+	return &Bot{
+		api:        api,
+		storage:    s,
+		categories: defaultCategories,
+	}
 }
 
 // Run запускает бота и обрабатывает входящие сообщения
@@ -76,9 +85,9 @@ func (b *Bot) Run() {
 				handlers.HandleReport(b.api, update, b.storage, "month")
 			case "export":
 				handlers.HandleExport(b.api, update, b.storage)
-			case "clear_last":
+			case "clear_last", "clearlast": // Принимаем оба варианта
 				handlers.HandleClearLast(b.api, update, b.storage)
-			case "clear_today":
+			case "clear_today", "cleartoday": // Принимаем оба варианта
 				handlers.HandleClearToday(b.api, update, b.storage)
 			default:
 				log.Printf("Неизвестная команда: /%s", command)
@@ -113,7 +122,7 @@ func (b *Bot) Run() {
 				if comment != "" {
 					log.Printf("Комментарий не пустой, начинаем классификацию транзакции...")
 					// Вызываем нашу функцию для классификации
-					category, err = ai.ClassifyTransaction(comment, transactionCategories)
+					category, err = ai.ClassifyTransaction(comment, b.categories)
 					if err != nil {
 						log.Printf("Ошибка при классификации транзакции: %v", err)
 						category = "Прочее" // Если произошла ошибка, используем категорию по умолчанию

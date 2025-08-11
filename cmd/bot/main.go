@@ -31,12 +31,12 @@ func main() {
 	}
 	log.Println("TELEGRAM_BOT_TOKEN успешно загружен.")
 
-	deepseekAPIKey := os.Getenv("DEEPSEEK_API_KEY")
-	if deepseekAPIKey == "" {
+	openRouterAPIKey := os.Getenv("OPENROUTER_API_KEY")
+	if openRouterAPIKey == "" {
 		// Можно сделать эту ошибку не фатальной, если AI не является основной функцией
-		log.Println("ВНИМАНИЕ: DEEPSEEK_API_KEY не найден в .env file. Функция классификации будет использовать категорию 'Прочее'.")
+		log.Println("ВНИМАНИЕ: OPENROUTER_API_KEY не найден в .env file. Функция классификации будет использовать категорию 'Прочее'.")
 	} else {
-		log.Println("DEEPSEEK_API_KEY успешно загружен.")
+		log.Println("OPENROUTER_API_KEY успешно загружен.")
 	}
 
 	// 2. Инициализируем хранилище данных (базу)
@@ -56,7 +56,7 @@ func main() {
 
 	// Инициализируем пакет AI с токеном
 	log.Println("Инициализация пакета AI...")
-	ai.Init(deepseekAPIKey)
+	ai.Init(openRouterAPIKey)
 	log.Println("Пакет AI успешно инициализирован.")
 
 	// 3. Создаем новый экземпляр нашего бота

@@ -13,9 +13,14 @@ func GetStartAndEndOfDay() (time.Time, time.Time) {
 // GetStartAndEndOfWeek возвращает начало и конец текущей недели
 func GetStartAndEndOfWeek() (time.Time, time.Time) {
 	now := time.Now()
-	startOfWeek := now.AddDate(0, 0, int(time.Monday-now.Weekday()))
-	startOfWeek = time.Date(startOfWeek.Year(), startOfWeek.Month(), startOfWeek.Day(), 0, 0, 0, 0, now.Location())
-	endOfWeek := startOfWeek.AddDate(0, 0, 7)
+	// Корректно вычисляем смещение до понедельника
+	offset := int(time.Monday - now.Weekday())
+	if offset > 0 { // Если сегодня воскресенье (в Go это 0), то смещение будет +1, что неверно.
+		offset = -6 // Для воскресенья нужно отнять 6 дней, чтобы получить прошлый понедельник.
+	}
+
+	startOfWeek := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, offset)
+	endOfWeek := startOfWeek.AddDate(0, 0, 7).Add(-time.Nanosecond) // Конец недели - это следующее воскресенье 23:59:59...
 	return startOfWeek, endOfWeek
 }
 

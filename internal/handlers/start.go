@@ -22,8 +22,8 @@ func HandleStart(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		"/month  \\- итоги за месяц\n" +
 		"/export  \\- выгрузить всё в CSV\n\n" +
 		"*Управление данными:*\n" +
-		"/clear_last \\- удалить последнюю запись\n" +
-		"/clear_today \\- удалить все записи за сегодня"
+		"/clearlast \\- удалить последнюю запись\n" +
+		"/cleartoday \\- удалить все записи за сегодня"
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2

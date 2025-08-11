@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -82,7 +83,7 @@ func (s *Storage) DeleteLastTransaction(userID int64) (*Transaction, error) {
 func (s *Storage) DeleteTransactionsForToday(userID int64) (int64, error) {
 	now := time.Now()
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	endOfDay := startOfDay.Add(24*time.Hour - 1) // Конец дня
+	endOfDay := startOfDay.Add(24 * time.Hour).Add(-time.Nanosecond) // Конец дня (23:59:59.999...)
 
 	result := s.db.Where("user_id = ? AND transaction_date BETWEEN ? AND ?", userID, startOfDay, endOfDay).Delete(&Transaction{})
 	if result.Error != nil {
@@ -90,4 +91,22 @@ func (s *Storage) DeleteTransactionsForToday(userID int64) (int64, error) {
 	}
 
 	return result.RowsAffected, nil
+}
+
+// GetAllTimeSummary calculates the sum of all transactions for a user.
+func (s *Storage) GetAllTimeSummary(userID int64) (float64, error) {
+	var total float64
+	// .Row().Scan() returns an error if no record is found.
+	// For SUM(), this happens when there are no transactions, and the result is NULL.
+	// We treat this as a total of 0 and no error.
+	err := s.db.Model(&Transaction{}).Where("user_id = ?", userID).Select("SUM(amount)").Row().Scan(&total)
+	if err != nil {
+		// If no records are found, GORM might return ErrRecordNotFound or a SQL-level error for NULL sum.
+		// In either case, a total of 0 is the correct interpretation.
+		if errors.Is(err, gorm.ErrRecordNotFound) || err.Error() == "sql: no rows in result set" {
+			return 0, nil
+		}
+		return 0, err // Return other, unexpected errors
+	}
+	return total, nil
 }

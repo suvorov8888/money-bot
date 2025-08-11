@@ -90,6 +90,15 @@ func HandleReport(bot *tgbotapi.BotAPI, update tgbotapi.Update, s *storage.Stora
 	responseText.WriteString(fmt.Sprintf("💸 *Расходы*: `%.2f` руб\\.\n", totalExpense))
 	responseText.WriteString(fmt.Sprintf("📈 *Баланс*: `%.2f` руб\\.", totalIncome+totalExpense))
 
+	// Получаем и добавляем общий баланс за все время для контекста
+	overallBalance, err := s.GetAllTimeSummary(update.Message.From.ID)
+	if err != nil {
+		log.Printf("Ошибка при получении общего баланса для UserID %d: %v", update.Message.From.ID, err)
+		// Не прерываем отчет, просто не показываем общий баланс
+	} else {
+		responseText.WriteString(fmt.Sprintf("\n\n🏦 *Общий баланс*: `%.2f` руб\\.", overallBalance))
+	}
+
 	log.Printf("Отчет сформирован. Итоги: Доход=%.2f, Расход=%.2f, Баланс=%.2f", totalIncome, totalExpense, totalIncome+totalExpense)
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, responseText.String())
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
